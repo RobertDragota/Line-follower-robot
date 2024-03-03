@@ -10,6 +10,6 @@ https://smartxprokits.in/how-to-make-a-line-follower-robot-using-arduino-connect
 
 Here you have some refference for PID controll
 
-https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller
+https://www.crystalinstruments.com/blog/2020/8/23/pid-control-theory
 
 ![Screenshot from 2024-03-03 23-48-18](https://github.com/RobertDragota/Line-follower-robot/assets/121293266/6d74c95c-63c8-4559-a263-8f1363469c08)
