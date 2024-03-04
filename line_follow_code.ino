@@ -1,92 +1,94 @@
 #include <QTRSensors.h>
-
 QTRSensors qtr;
+
 const uint8_t SensorCount = 8;
 uint16_t sensorValues[SensorCount];
+uint8_t enA = 5;
+uint8_t RightMotorA = 6;
+uint8_t RightMotorB = 7;
+uint8_t LeftMotorA = 9;
+uint8_t LeftMotorB = 8;
+uint8_t enB = 10;
 
-float Kp = 0; 
-float Ki = 0; 
-float Kd = 0; 
-int P, I, D;
 
 int lastError = 0;
-boolean onoff = false;
+long integral = 0;
 
-const uint8_t maxspeeda = 150;
-const uint8_t maxspeedb = 150;
-const uint8_t basespeeda = 100;
-const uint8_t basespeedb = 100;
 
-int mode = 8;
-int aphase = 9;
-int aenbl = 6;
-int bphase = 5;
-int benbl = 3;
-
-int buttoncalibrate = 17; 
-int buttonstart = 2;
+float Kp = 0.3; 
+float Ki = 0.2; 
+float Kd = 0.5; 
 
 void setup() {
-  qtr.setTypeRC();
-  qtr.setSensorPins((const uint8_t[]){10, 11, 12, 14, 15, 16, 18, 19}, SensorCount);
-  qtr.setEmitterPin(7);
+  pinMode(RightMotorA, OUTPUT);
+  pinMode(RightMotorB, OUTPUT);
+  pinMode(LeftMotorA, OUTPUT);
+  pinMode(LeftMotorB, OUTPUT);
+  pinMode(enA, OUTPUT);
+  pinMode(enB, OUTPUT);
 
-  pinMode(mode, OUTPUT);
-  pinMode(aphase, OUTPUT);
-  pinMode(aenbl, OUTPUT);
-  pinMode(bphase, OUTPUT);
-  pinMode(benbl, OUTPUT);
-  digitalWrite(mode, HIGH); 
-  delay(500);
+  qtr.setTypeAnalog();
+  qtr.setSensorPins((const uint8_t[]){A0, A1, A2, A3, A4, A5, A6, A7}, SensorCount);
+  qtr.setEmitterPin(2);
+
   pinMode(LED_BUILTIN, OUTPUT);
-
-  while (!digitalRead(buttoncalibrate)) {
-    delay(10); // Wait for the button to be pressed
-  }
-  calibration(); 
-  forward_brake(0, 0); 
-}
-
-void calibration() {
   digitalWrite(LED_BUILTIN, HIGH);
+
   for (uint16_t i = 0; i < 400; i++) {
     qtr.calibrate();
   }
   digitalWrite(LED_BUILTIN, LOW);
+
+  Serial.begin(9600);
+  for (uint8_t i = 0; i < SensorCount; i++) {
+    Serial.print(qtr.calibrationOn.minimum[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+
+  for (uint8_t i = 0; i < SensorCount; i++) {
+    Serial.print(qtr.calibrationOn.maximum[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+  Serial.println();
+  delay(1000);
+}
+
+void MoveRightFront(uint16_t velocity) {
+  digitalWrite(RightMotorA, HIGH);
+  digitalWrite(RightMotorB, LOW);
+  analogWrite(enA, velocity);
+}
+
+void MoveLeftFront(uint16_t velocity) {
+  digitalWrite(LeftMotorA, HIGH);
+  digitalWrite(LeftMotorB, LOW);
+  analogWrite(enB, velocity);
 }
 
 void loop() {
-  if(digitalRead(buttonstart) == HIGH) {
-    onoff = !onoff;
-    delay(onoff ? 1000 : 50);
-  }
-  if (onoff) {
-    PID_control();
-  } else {
-    forward_brake(0,0); 
-  }
-}
+  uint16_t position = qtr.readLineBlack(sensorValues);
+  Serial.println(position);
 
-void forward_brake(int posa, int posb) {
-  digitalWrite(aphase, LOW);
-  digitalWrite(bphase, LOW);
-  analogWrite(aenbl, posa);
-  analogWrite(benbl, posb);
-}
+  // PID computation
+  int error = 3500 - position; // Assuming 3500 is the desired center position
+  integral += error;
+  int derivative = error - lastError;
 
-void PID_control() {
-  uint16_t position = qtr.readLineBlack(sensorValues); 
-  int error = 3500 - position; 
-
-  P = error;
-  I += error;
-  D = error - lastError;
-
+  int motorspeed = Kp * error + Ki * integral + Kd * derivative;
   lastError = error;
-  int motorspeed = P*Kp + I*Ki + D*Kd; 
 
-  int motorspeeda = constrain(basespeeda + motorspeed, 0, maxspeeda);
-  int motorspeedb = constrain(basespeedb - motorspeed, 0, maxspeedb);
-  
-  forward_brake(motorspeeda, motorspeedb);
+ 
+  int motorspeedRight = constrain(255 + motorspeed, 0, 255); 
+  int motorspeedLeft = constrain(255 - motorspeed, 0, 255);
+
+  MoveRightFront(motorspeedRight);
+  MoveLeftFront(motorspeedLeft);
+
+  for (uint8_t i = 0; i < SensorCount; i++) {
+    Serial.print(sensorValues[i]);
+    Serial.print('\t');
+  }
+  Serial.println(position);
 }
